@@ -35,7 +35,7 @@ export default function SectionCard({ store, menuId, section, index, count, busy
                     <strong>{item.name}</strong>
                     {item.description && <><br /><span className="muted small">{truncate(item.description, 90)}</span></>}
                 </td>
-                <td>{item.category}</td>
+                <td>{item.category || <span className="muted">bez kategorie</span>}</td>
                 <td className="nowrap">{item.price}</td>
                 <td className="actions">
                     <button type="button" className="btn-icon" title="Posunout nahoru" disabled={busy || i === 0}

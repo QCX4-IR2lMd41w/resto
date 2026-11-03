@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { CATEGORIES, FIELD_LIMITS, activeMenu, imageUrl, type MenuItem, type TextField } from '../../../shared/menu';
+import { CATEGORIES, FIELD_LIMITS, NO_CATEGORY, activeMenu, imageUrl, type MenuItem, type TextField } from '../../../shared/menu';
 import { api } from '../../api';
 import { useApp, useTitle } from '../../context';
 import { Link, navigate } from '../../router';
@@ -100,7 +100,8 @@ export default function ItemForm({ id }: { id?: string }) {
                     </label>
                     <label className="grow">Kategorie
                         <select value={draft.category} onChange={set('category')}>
-                            {CATEGORIES.map((cat) => <option key={cat}>{cat}</option>)}
+                            {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                            <option value={NO_CATEGORY}>— nezobrazovat kategorii —</option>
                         </select>
                     </label>
                 </div>

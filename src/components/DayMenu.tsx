@@ -1,4 +1,4 @@
-import { CATEGORIES, imageUrl, type MenuItem } from '../../shared/menu';
+import { CATEGORIES, NO_CATEGORY, imageUrl, type MenuItem } from '../../shared/menu';
 
 function Dish({ item }: { item: MenuItem }) {
     const img = imageUrl(item.image);
@@ -19,19 +19,20 @@ function Dish({ item }: { item: MenuItem }) {
     );
 }
 
-/** Dishes of one section, grouped by category. */
+/** Dishes of one section, grouped by category; dishes without a category come first, with no heading. */
 export default function DayMenu({ items, emptyText = 'Zatím zde nic není.' }: { items: MenuItem[]; emptyText?: string }) {
     if (!items.length) return <p className="empty">{emptyText}</p>;
     const known = new Set<string>(CATEGORIES);
-    return CATEGORIES.map((cat) => {
-        const group = items.filter((i) => (known.has(i.category) ? i.category : 'Ostatní') === cat);
-        return group.length ? (
-            <div key={cat}>
-                <h3 className="category">{cat}</h3>
-                <div className="dishes">
-                    {group.map((item) => <Dish key={item.id} item={item} />)}
-                </div>
+    const groups = [NO_CATEGORY, ...CATEGORIES].map((cat) => ({
+        cat,
+        items: items.filter((i) => (i.category === NO_CATEGORY || known.has(i.category) ? i.category : 'Ostatní') === cat),
+    }));
+    return groups.map(({ cat, items: group }) => group.length ? (
+        <div key={cat || 'none'}>
+            {cat && <h3 className="category">{cat}</h3>}
+            <div className="dishes">
+                {group.map((item) => <Dish key={item.id} item={item} />)}
             </div>
-        ) : null;
-    });
+        </div>
+    ) : null);
 }

@@ -8,7 +8,10 @@ export const LIMITS = { menuName: 60, note: 120, sectionTitle: 60, menus: 20, se
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 export type DayCode = keyof typeof DAYS;
-export type Category = (typeof CATEGORIES)[number];
+/** '' = no category: the dish is listed without a category heading. */
+export const NO_CATEGORY = '';
+export type Category = (typeof CATEGORIES)[number] | typeof NO_CATEGORY;
+export const isCategory = (v: unknown): v is Category => v === NO_CATEGORY || CATEGORIES.includes(v as (typeof CATEGORIES)[number]);
 export type TextField = keyof typeof FIELD_LIMITS;
 
 export interface MenuItem extends Record<TextField, string> {
