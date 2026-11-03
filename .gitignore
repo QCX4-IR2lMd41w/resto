@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars*
+users.json
+worker-configuration.d.ts
+.idea/

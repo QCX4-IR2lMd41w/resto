@@ -1,0 +1,31 @@
+{
+  "name": "hostinec-na-fare",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "npm run build && vite preview",
+    "deploy": "npm run build && wrangler deploy",
+    "typecheck": "wrangler types && tsc -b",
+    "cf-typegen": "wrangler types",
+    "users": "node scripts/users.mjs",
+    "seed:local": "wrangler kv key put menu --path seed/menu.json --binding MENU_KV --local",
+    "seed:remote": "wrangler kv key put menu --path seed/menu.json --binding MENU_KV --remote"
+  },
+  "dependencies": {
+    "hono": "4.13.13",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.64.0",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "wrangler": "4.151.0"
+  }
+}

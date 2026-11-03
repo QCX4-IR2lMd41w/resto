@@ -1,0 +1,25 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "hostinec-na-fare",
+	"compatibility_date": "2026-10-14",
+	// Backend API (Hono) – handles only /api/*; everything else is the React SPA from static assets.
+	"main": "./worker/index.ts",
+	"assets": {
+		"not_found_handling": "single-page-application",
+		"run_worker_first": [
+			"/api/*"
+		]
+	},
+	"kv_namespaces": [
+		// Create with: npx wrangler kv namespace create MENU_KV – then paste the id here.
+		{
+			"binding": "MENU_KV",
+			"id": "eb83798b473b47ce86b68b0341bd27d2"
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true
+	// Secrets (not in this file): USERS, SESSION_SECRET – see AGENTS.md
+}
