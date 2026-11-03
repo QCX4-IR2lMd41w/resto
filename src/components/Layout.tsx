@@ -31,7 +31,7 @@ export default function Layout({ isAdmin, children }: { isAdmin: boolean; childr
                         {!isAdmin && (
                             <>
                                 <Link to="/">Úvod</Link>
-                                <Link to="/menu">Týdenní menu</Link>
+                                <Link to="/menu">Menu</Link>
                                 <a href="/#kontakt" onClick={(e) => { e.preventDefault(); navigate('/#kontakt'); document.getElementById('kontakt')?.scrollIntoView(); }}>Kontakt</a>
                             </>
                         )}

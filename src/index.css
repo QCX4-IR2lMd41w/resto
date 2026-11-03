@@ -142,3 +142,11 @@ code { background: #efe6d9; padding: .1rem .35rem; border-radius: 4px; }
 }
 .pre-line { white-space: pre-line; }
 .admin .actions .btn-icon, .admin .actions .btn, .admin .actions form { vertical-align: middle; }
+.badge-muted { background: #b9a993; }
+.section-subtitle { font-size: 1.05rem; margin: 1rem 0 .2rem; }
+.menu-head { margin: 1.5rem 0 1rem; }
+.menu-head h2 { margin: 0; }
+.day-head .actions { display: flex; flex-wrap: wrap; gap: .35rem; justify-content: flex-end; align-items: center; }
+.section-editor label:not(.grow) select { width: auto; }
+.menu-tabs { margin: .5rem 0; }
+.card > form.row { margin-top: 1rem; }

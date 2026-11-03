@@ -1,129 +1,167 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { SECTIONS, SECTION_CODES, WEEK_LABEL_LIMIT, imageUrl, todayCode, type MenuItem, type SectionCode } from '../../../shared/menu';
-import { api, type MenuResult } from '../../api';
+import { LIMITS, type MenuTemplate } from '../../../shared/menu';
+import { api, type StoreResult } from '../../api';
 import { useApp, useTitle } from '../../context';
-import { Link, useScrollToHash } from '../../router';
-import { useMenu } from '../../useMenu';
+import { navigate, useLocation, useScrollToHash } from '../../router';
+import { useStore } from '../../useMenu';
+import SectionCard from './SectionCard';
+import SectionEditor from './SectionEditor';
 import { useAdminErrorHandler } from './useAdminAction';
 
-const truncate = (s: string, n: number) => (Array.from(s).length > n ? `${Array.from(s).slice(0, n).join('')}…` : s);
+const TEMPLATES: Record<MenuTemplate, string> = {
+    weekly: 'Týdenní menu (Po–Pá + Stálá nabídka)',
+    empty: 'Prázdné menu',
+    copy: 'Kopie vybraného menu',
+};
 
 export default function Dashboard() {
     useTitle('Správa menu');
-    const { menu, setMenu, error } = useMenu();
+    const { store, setStore, error } = useStore();
     const { setFlashes } = useApp();
     const onError = useAdminErrorHandler();
-    const [weekLabel, setWeekLabel] = useState('');
+    const location = useLocation();
     const [busy, setBusy] = useState(false);
-    const today = todayCode();
-    useScrollToHash(menu !== null);
+    const [name, setName] = useState('');
+    const [note, setNote] = useState('');
+    const [newName, setNewName] = useState('');
+    const [template, setTemplate] = useState<MenuTemplate>('weekly');
+    useScrollToHash(store !== undefined);
+
+    const requested = new URLSearchParams(location.split('?')[1] ?? '').get('menu');
+    const menu = store?.menus.find((m) => m.id === requested) ?? store?.menus.find((m) => m.id === store.activeId) ?? store?.menus[0];
 
     useEffect(() => {
-        if (menu) setWeekLabel(menu.week_label);
-    }, [menu]);
+        setName(menu?.name ?? '');
+        setNote(menu?.note ?? '');
+    }, [menu?.id, menu?.name, menu?.note]);
 
-    async function run(action: () => Promise<MenuResult>, confirmText?: string) {
-        if (confirmText && !window.confirm(confirmText)) return;
+    const select = (id: string, message?: string) =>
+        navigate(`/admin?menu=${id}`, { replace: true, flash: message ? ['ok', message] : undefined });
+
+    /** Runs an admin API call, shows its message and refreshes the data. Returns true on success. */
+    async function run(action: () => Promise<StoreResult>, confirmText?: string) {
+        if (confirmText && !window.confirm(confirmText)) return false;
         setBusy(true);
         try {
             const result = await action();
-            setMenu(result.menu);
+            setStore(result.store);
             setFlashes(result.message ? [['ok', result.message]] : []);
+            return true;
         } catch (err) {
             onError(err);
+            return false;
         } finally {
             setBusy(false);
         }
     }
 
-    function saveWeek(e: FormEvent) {
+    async function createMenu(e: FormEvent) {
         e.preventDefault();
-        run(() => api.setWeekLabel(weekLabel));
+        const before = new Set(store?.menus.map((m) => m.id));
+        let created: string | undefined;
+        let message: string | undefined;
+        const ok = await run(async () => {
+            const result = await api.createMenu(newName, template, template === 'copy' ? menu?.id : undefined);
+            created = result.store.menus.find((m) => !before.has(m.id))?.id;
+            message = result.message;
+            return result;
+        });
+        if (ok) {
+            setNewName('');
+            if (created) select(created, message);
+        }
     }
 
     if (error) return <p className="flash flash-error">{error}</p>;
-    if (!menu) return <p className="muted">Načítám…</p>;
-
-    const row = (code: SectionCode, items: MenuItem[], item: MenuItem, i: number) => {
-        const img = imageUrl(item.image);
-        const copy = (e: FormEvent<HTMLFormElement>) => {
-            e.preventDefault();
-            const target = new FormData(e.currentTarget).get('target') as SectionCode;
-            run(() => api.copyItem(item.id, target));
-        };
-        return (
-            <tr key={item.id}>
-                <td className="thumb">{img && <img src={img} alt="" />}</td>
-                <td>
-                    <strong>{item.name}</strong>
-                    {item.description && <><br /><span className="muted small">{truncate(item.description, 90)}</span></>}
-                </td>
-                <td>{item.category}</td>
-                <td className="nowrap">{item.price}</td>
-                <td className="actions">
-                    <button type="button" className="btn-icon" title="Posunout nahoru" disabled={busy || i === 0}
-                        onClick={() => run(() => api.moveItem(item.id, 'up'))}>&uarr;</button>
-                    <button type="button" className="btn-icon" title="Posunout dolů" disabled={busy || i === items.length - 1}
-                        onClick={() => run(() => api.moveItem(item.id, 'down'))}>&darr;</button>
-                    <Link className="btn btn-small" to={`/admin/item/${item.id}`}>Upravit</Link>
-                    <form className="inline copy-form" onSubmit={copy}>
-                        <select name="target" aria-label="Kopírovat do">
-                            {SECTION_CODES.filter((c) => c !== code).map((c) => <option key={c} value={c}>{SECTIONS[c]}</option>)}
-                        </select>
-                        <button type="submit" className="btn btn-small btn-secondary" disabled={busy}>Kopírovat</button>
-                    </form>
-                    <button type="button" className="btn btn-small btn-danger" disabled={busy}
-                        onClick={() => run(() => api.deleteItem(item.id), `Opravdu smazat „${item.name}“?`)}>Smazat</button>
-                </td>
-            </tr>
-        );
-    };
+    if (!store || !menu) return <p className="muted">Načítám…</p>;
+    const isActive = menu.id === store.activeId;
+    const hasDays = menu.sections.some((s) => s.weekday);
 
     return (
         <>
-            <h1>Správa týdenního menu</h1>
+            <h1>Správa menu</h1>
 
-            <section className="card toolbar">
-                <form className="row" onSubmit={saveWeek}>
-                    <label className="grow">Označení týdne (zobrazí se nad menu)
-                        <input type="text" maxLength={WEEK_LABEL_LIMIT} value={weekLabel} onChange={(e) => setWeekLabel(e.target.value)}
-                            placeholder="např. Menu 21. – 25. 10. 2026" />
+            <section className="card">
+                <h2>Uložená menu</h2>
+                <nav className="day-tabs menu-tabs">
+                    {store.menus.map((m) => (
+                        <a key={m.id} href={`/admin?menu=${m.id}`} className={m.id === menu.id ? 'active' : ''}
+                            onClick={(e) => { e.preventDefault(); select(m.id); }}>
+                            {m.name}{m.id === store.activeId && ' ★'}
+                        </a>
+                    ))}
+                </nav>
+                <p className="muted small">★ = menu zobrazené na webu. Kliknutím na název menu otevřete jeho úpravy.</p>
+                <form className="row" onSubmit={createMenu}>
+                    <label className="grow">Nové menu
+                        <input type="text" required maxLength={LIMITS.menuName} value={newName} onChange={(e) => setNewName(e.target.value)}
+                            placeholder="např. Týden 10. – 14. 11., Vánoční menu" />
+                    </label>
+                    <label>Vytvořit jako
+                        <select value={template} onChange={(e) => setTemplate(e.target.value as MenuTemplate)}>
+                            {(Object.keys(TEMPLATES) as MenuTemplate[]).map((t) => (
+                                <option key={t} value={t}>{t === 'copy' ? `Kopie „${menu.name}“` : TEMPLATES[t]}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <button type="submit" className="btn" disabled={busy || store.menus.length >= LIMITS.menus}>Vytvořit</button>
+                </form>
+            </section>
+
+            <section className={`card${isActive ? ' today' : ''}`}>
+                <div className="day-head">
+                    <h2>{menu.name} {isActive ? <span className="badge">zobrazeno na webu</span> : <span className="badge badge-muted">uloženo</span>}</h2>
+                    <div className="actions">
+                        {!isActive && (
+                            <button type="button" className="btn" disabled={busy}
+                                onClick={() => run(() => api.activateMenu(menu.id))}>Zobrazit na webu</button>
+                        )}
+                        {hasDays && (
+                            <button type="button" className="btn btn-secondary" disabled={busy}
+                                onClick={() => run(() => api.clearDays(menu.id), 'Smazat všechna jídla ze dnů v týdnu? Ostatní sekce (např. Stálá nabídka) zůstanou.')}>
+                                Vyprázdnit dny
+                            </button>
+                        )}
+                        <button type="button" className="btn btn-danger" disabled={busy || isActive}
+                            title={isActive ? 'Aktivní menu nelze smazat – nejdřív zobrazte na webu jiné.' : undefined}
+                            onClick={() => run(() => api.deleteMenu(menu.id), `Opravdu smazat menu „${menu.name}“ včetně všech jídel a obrázků?`)}>
+                            Smazat menu
+                        </button>
+                    </div>
+                </div>
+                <form className="row" onSubmit={(e) => { e.preventDefault(); run(() => api.updateMenu(menu.id, name, note)); }}>
+                    <label className="grow">Název menu
+                        <input type="text" required maxLength={LIMITS.menuName} value={name} onChange={(e) => setName(e.target.value)} />
+                    </label>
+                    <label className="grow">Poznámka (zobrazí se pod názvem)
+                        <input type="text" maxLength={LIMITS.note} value={note} onChange={(e) => setNote(e.target.value)} placeholder="např. Polední menu 3. – 7. 11. 2026" />
                     </label>
                     <button type="submit" className="btn" disabled={busy}>Uložit</button>
                 </form>
-                <button type="button" className="btn btn-danger" disabled={busy}
-                    onClick={() => run(api.clearWeek, 'Opravdu smazat celé týdenní menu včetně obrázků? (Stálá nabídka zůstane.)')}>
-                    Smazat celý týden
-                </button>
             </section>
 
-            <nav className="day-tabs">
-                {SECTION_CODES.map((code) => (
-                    <a key={code} href={`#den-${code}`} className={code === today ? 'active' : ''}>
-                        {SECTIONS[code]} ({menu.days[code].length})
-                    </a>
-                ))}
-            </nav>
+            {menu.sections.length > 1 && (
+                <nav className="day-tabs">
+                    {menu.sections.map((s) => (
+                        <a key={s.id} href={`#sekce-${s.id}`}>{s.title} ({s.items.length})</a>
+                    ))}
+                </nav>
+            )}
 
-            {SECTION_CODES.map((code) => {
-                const items = menu.days[code];
-                return (
-                    <section key={code} className={`card day${code === today ? ' today' : ''}`} id={`den-${code}`}>
-                        <div className="day-head">
-                            <h2>{SECTIONS[code]}{code === today && <> <span className="badge">dnes</span></>}</h2>
-                            <Link className="btn" to={`/admin/item/new?day=${code}`}>+ Přidat jídlo</Link>
-                        </div>
-                        {items.length ? (
-                            <table className="admin-table">
-                                <thead>
-                                    <tr><th></th><th>Jídlo</th><th>Kategorie</th><th>Cena</th><th className="actions">Akce</th></tr>
-                                </thead>
-                                <tbody>{items.map((item, i) => row(code, items, item, i))}</tbody>
-                            </table>
-                        ) : <p className="empty">Žádná jídla.</p>}
-                    </section>
-                );
-            })}
+            {menu.sections.map((section, i) => (
+                <SectionCard key={section.id} store={store} menuId={menu.id} section={section} index={i}
+                    count={menu.sections.length} busy={busy} run={run} />
+            ))}
+
+            <section className="card">
+                <h2>Přidat sekci</h2>
+                <p className="muted small">
+                    Sekce může být cokoliv s názvem (Polévky, Stálá nabídka…). Pokud název začíná dnem v týdnu (např. „Pondělí 3. 11.“),
+                    den se nastaví automaticky a na úvodní stránce se sekce ukáže jako dnešní menu.
+                </p>
+                <SectionEditor submitLabel="Přidat sekci" busy={busy || menu.sections.length >= LIMITS.sections}
+                    onSubmit={(title, weekday) => run(() => api.addSection(menu.id, { title, weekday }))} />
+            </section>
         </>
     );
 }

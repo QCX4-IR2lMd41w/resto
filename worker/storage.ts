@@ -1,29 +1,85 @@
-import { MAX_UPLOAD_BYTES, emptyMenu, type Menu, type SectionCode } from '../shared/menu';
+import {
+    DAYS, DAY_CODES, MAX_UPLOAD_BYTES, isDay, type Menu, type MenuItem, type MenuStore, type Section,
+} from '../shared/menu';
 import type { Bindings } from './auth';
 
-const MENU_KEY = 'menu';
+const STORE_KEY = 'menus';
+const LEGACY_MENU_KEY = 'menu'; // single weekly menu used before multiple menus existed
 const IMAGE_NAME = /^[a-f0-9]{32}$/;
 
 export function randomHex(bytes = 16) {
     return [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export async function readMenu(env: Bindings): Promise<Menu> {
-    const stored = await env.MENU_KV.get<Partial<Menu>>(MENU_KEY, { type: 'json' });
-    const empty = emptyMenu();
-    return { week_label: stored?.week_label ?? '', days: { ...empty.days, ...(stored?.days ?? {}) } };
+export const newSection = (title: string, weekday: Section['weekday'] = null): Section =>
+    ({ id: randomHex(16), title, weekday, items: [] });
+
+/** Monday–Friday plus "Stálá nabídka" – the default layout of a weekly lunch menu. */
+export function weeklySections(): Section[] {
+    return [...DAY_CODES.slice(0, 5).map((code) => newSection(DAYS[code], code)), newSection('Stálá nabídka')];
 }
 
-export async function writeMenu(env: Bindings, menu: Menu) {
-    await env.MENU_KV.put(MENU_KEY, JSON.stringify(menu));
+type LegacyMenu = { week_label?: string; days?: Record<string, MenuItem[]> };
+
+/** Converts the old {week_label, days: {po: [...], …, stala: [...]}} format into a store with one weekly menu. */
+function fromLegacy(legacy: LegacyMenu): MenuStore {
+    const days = legacy.days ?? {};
+    const sections = DAY_CODES
+        .filter((code) => ['po', 'ut', 'st', 'ct', 'pa'].includes(code) || days[code]?.length)
+        .map((code) => ({ ...newSection(DAYS[code], code), items: days[code] ?? [] }));
+    if (days.stala?.length) sections.push({ ...newSection('Stálá nabídka'), items: days.stala });
+    const menu: Menu = { id: randomHex(16), name: 'Týdenní menu', note: legacy.week_label ?? '', sections };
+    return { activeId: menu.id, menus: [menu] };
 }
 
-export function findItem(menu: Menu, id: string): [SectionCode, number] | null {
-    for (const [day, items] of Object.entries(menu.days) as [SectionCode, Menu['days'][SectionCode]][]) {
-        const i = items.findIndex((item) => item.id === id);
-        if (i !== -1) return [day, i];
+export async function readStore(env: Bindings): Promise<MenuStore> {
+    const store = await env.MENU_KV.get<MenuStore>(STORE_KEY, { type: 'json' });
+    if (store) return store;
+    // First run (or data from the single-menu version): create the store once so ids stay stable.
+    const legacy = await env.MENU_KV.get<LegacyMenu>(LEGACY_MENU_KEY, { type: 'json' });
+    const menu: Menu = { id: randomHex(16), name: 'Týdenní menu', note: '', sections: weeklySections() };
+    const created = legacy ? fromLegacy(legacy) : { activeId: menu.id, menus: [menu] };
+    await writeStore(env, created);
+    return created;
+}
+
+export async function writeStore(env: Bindings, store: MenuStore) {
+    await env.MENU_KV.put(STORE_KEY, JSON.stringify(store));
+}
+
+export const findMenu = (store: MenuStore, id: string) => store.menus.find((m) => m.id === id) ?? null;
+
+export function findSection(store: MenuStore, id: string): { menu: Menu; section: Section; index: number } | null {
+    for (const menu of store.menus) {
+        const index = menu.sections.findIndex((s) => s.id === id);
+        if (index !== -1) return { menu, section: menu.sections[index], index };
     }
     return null;
+}
+
+export function findItem(store: MenuStore, id: string): { menu: Menu; section: Section; index: number } | null {
+    for (const menu of store.menus) {
+        for (const section of menu.sections) {
+            const index = section.items.findIndex((item) => item.id === id);
+            if (index !== -1) return { menu, section, index };
+        }
+    }
+    return null;
+}
+
+export const parseWeekday = (v: unknown) => (isDay(v) ? v : null);
+
+/** Deep copy with fresh ids; images are duplicated so deleting one menu never breaks another. */
+export async function cloneSections(env: Bindings, sections: Section[]): Promise<Section[]> {
+    return Promise.all(sections.map(async (s) => ({
+        ...s,
+        id: randomHex(16),
+        items: await Promise.all(s.items.map(async (item) => ({ ...item, id: randomHex(16), image: await copyImage(env, item.image) }))),
+    })));
+}
+
+export async function deleteSectionImages(env: Bindings, sections: Section[]) {
+    await Promise.all(sections.flatMap((s) => s.items.map((item) => deleteImage(env, item.image))));
 }
 
 // ---------- images (stored in the same KV namespace) ----------

@@ -1,38 +1,62 @@
 import DayMenu from '../components/DayMenu';
-import { DAYS, SECTIONS, todayCode, todayDate } from '../../shared/menu';
+import { DAYS, todayCode, todayDate } from '../../shared/menu';
 import { site } from '../../shared/site';
 import { useTitle } from '../context';
 import { Link, useScrollToHash } from '../router';
-import { useMenu } from '../useMenu';
+import { useActiveMenu } from '../useMenu';
 
 export default function Home() {
     useTitle('Úvod');
-    const { menu, error } = useMenu();
+    const { menu, error } = useActiveMenu();
     const today = todayCode();
-    useScrollToHash(menu !== null);
-    const permanent = menu?.days.stala ?? [];
+    useScrollToHash(menu !== undefined);
+
+    const sections = menu?.sections ?? [];
+    const hasDays = sections.some((s) => s.weekday);
+    const todays = sections.filter((s) => s.weekday === today);
+    // Weekly menus: today's day + sections without a weekday (e.g. "Stálá nabídka"). Other menus: all sections.
+    const others = hasDays ? sections.filter((s) => !s.weekday) : sections;
 
     return (
         <>
             <section className="hero">
                 <h1>{site.name}</h1>
                 <p className="tagline">{site.tagline}</p>
-                <Link className="btn" to="/menu">Celé týdenní menu</Link>
+                <Link className="btn" to="/menu">Celé menu</Link>
             </section>
 
-            <section className="card">
-                <h2>Dnešní menu <span className="muted">&ndash; {DAYS[today]} {todayDate()}</span></h2>
-                <p className="muted">{site.lunchHours}</p>
-                {error ? <p className="flash flash-error">{error}</p> : menu ? <DayMenu items={menu.days[today]} /> : <p className="muted">Načítám…</p>}
-                {site.orderInfo && <p className="order-info">{site.orderInfo}</p>}
-            </section>
+            {error && <p className="flash flash-error">{error}</p>}
+            {menu === undefined && !error && <p className="muted">Načítám…</p>}
+            {menu === null && <section className="card"><p className="empty">Menu zatím není k dispozici.</p></section>}
 
-            {permanent.length > 0 && (
+            {menu && hasDays && (
                 <section className="card">
-                    <h2>{SECTIONS.stala}</h2>
-                    <DayMenu items={permanent} />
+                    <h2>Dnešní menu <span className="muted">&ndash; {DAYS[today]} {todayDate()}</span></h2>
+                    <p className="muted">{site.lunchHours}</p>
+                    {todays.length === 0 && <p className="empty">Dnes polední menu nepodáváme.</p>}
+                    {todays.map((s) => (
+                        <div key={s.id}>
+                            {(todays.length > 1 || s.title !== DAYS[today]) && <h3 className="section-subtitle">{s.title}</h3>}
+                            <DayMenu items={s.items} emptyText="Pro dnešek zatím menu nemáme." />
+                        </div>
+                    ))}
+                    {site.orderInfo && <p className="order-info">{site.orderInfo}</p>}
                 </section>
             )}
+
+            {menu && !hasDays && (menu.name || menu.note) && (
+                <div className="menu-head">
+                    <h2>{menu.name}</h2>
+                    {menu.note && <p className="week-label">{menu.note}</p>}
+                </div>
+            )}
+
+            {others.map((s) => (
+                <section key={s.id} className="card">
+                    <h2>{s.title}</h2>
+                    <DayMenu items={s.items} />
+                </section>
+            ))}
 
             <div className="grid-2">
                 <section className="card about">

@@ -19,10 +19,12 @@ function Dish({ item }: { item: MenuItem }) {
     );
 }
 
-export default function DayMenu({ items }: { items: MenuItem[] }) {
-    if (!items.length) return <p className="empty">Pro tento den zatím menu nemáme.</p>;
+/** Dishes of one section, grouped by category. */
+export default function DayMenu({ items, emptyText = 'Zatím zde nic není.' }: { items: MenuItem[]; emptyText?: string }) {
+    if (!items.length) return <p className="empty">{emptyText}</p>;
+    const known = new Set<string>(CATEGORIES);
     return CATEGORIES.map((cat) => {
-        const group = items.filter((i) => (i.category ?? 'Ostatní') === cat);
+        const group = items.filter((i) => (known.has(i.category) ? i.category : 'Ostatní') === cat);
         return group.length ? (
             <div key={cat}>
                 <h3 className="category">{cat}</h3>

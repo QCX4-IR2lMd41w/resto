@@ -1,36 +1,42 @@
 import DayMenu from '../components/DayMenu';
-import { SECTIONS, SECTION_CODES, todayCode } from '../../shared/menu';
+import { todayCode } from '../../shared/menu';
 import { site } from '../../shared/site';
 import { useTitle } from '../context';
 import { useScrollToHash } from '../router';
-import { useMenu } from '../useMenu';
+import { useActiveMenu } from '../useMenu';
 
+/** The active menu with all its sections (days of the week or anything else). */
 export default function WeeklyMenu() {
-    useTitle('Týdenní menu');
-    const { menu, error } = useMenu();
+    const { menu, error } = useActiveMenu();
+    useTitle(menu?.name || 'Menu');
     const today = todayCode();
-    useScrollToHash(menu !== null);
+    useScrollToHash(menu !== undefined);
+    const hasDays = menu?.sections.some((s) => s.weekday);
 
     return (
         <>
             <div className="page-banner" role="img" aria-label={`Cedule ${site.name}`} />
-            <h1>Týdenní menu</h1>
-            {menu?.week_label && <p className="week-label">{menu.week_label}</p>}
-            <p className="muted">{site.lunchHours}</p>
+            <h1>{menu?.name || 'Menu'}</h1>
+            {menu?.note && <p className="week-label">{menu.note}</p>}
+            {hasDays && <p className="muted">{site.lunchHours}</p>}
             {site.orderInfo && <p className="order-info">{site.orderInfo}</p>}
 
-            <nav className="day-tabs">
-                {SECTION_CODES.map((code) => (
-                    <a key={code} href={`#den-${code}`} className={code === today ? 'active' : ''}>{SECTIONS[code]}</a>
-                ))}
-            </nav>
-
             {error && <p className="flash flash-error">{error}</p>}
-            {!menu && !error && <p className="muted">Načítám…</p>}
-            {menu && SECTION_CODES.map((code) => (
-                <section key={code} className={`card day${code === today ? ' today' : ''}`} id={`den-${code}`}>
-                    <h2>{SECTIONS[code]}{code === today && <> <span className="badge">dnes</span></>}</h2>
-                    <DayMenu items={menu.days[code]} />
+            {menu === undefined && !error && <p className="muted">Načítám…</p>}
+            {menu === null && <p className="empty">Menu zatím není k dispozici.</p>}
+
+            {menu && menu.sections.length > 1 && (
+                <nav className="day-tabs">
+                    {menu.sections.map((s) => (
+                        <a key={s.id} href={`#sekce-${s.id}`} className={s.weekday === today ? 'active' : ''}>{s.title}</a>
+                    ))}
+                </nav>
+            )}
+
+            {menu?.sections.map((s) => (
+                <section key={s.id} className={`card day${s.weekday === today ? ' today' : ''}`} id={`sekce-${s.id}`}>
+                    <h2>{s.title}{s.weekday === today && <> <span className="badge">dnes</span></>}</h2>
+                    <DayMenu items={s.items} emptyText={s.weekday ? 'Pro tento den zatím menu nemáme.' : 'Zatím zde nic není.'} />
                 </section>
             ))}
         </>

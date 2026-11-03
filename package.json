@@ -10,8 +10,8 @@
     "typecheck": "wrangler types && tsc -b",
     "cf-typegen": "wrangler types",
     "users": "node scripts/users.mjs",
-    "seed:local": "wrangler kv key put menu --path seed/menu.json --binding MENU_KV --local",
-    "seed:remote": "wrangler kv key put menu --path seed/menu.json --binding MENU_KV --remote"
+    "seed:local": "wrangler kv key put menus --path seed/menus.json --binding MENU_KV --local",
+    "seed:remote": "wrangler kv key put menus --path seed/menus.json --binding MENU_KV --remote"
   },
   "dependencies": {
     "hono": "4.13.13",
