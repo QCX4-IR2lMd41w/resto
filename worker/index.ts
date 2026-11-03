@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import {
-    FIELD_LIMITS, LIMITS, activeMenu, isCategory,
+    FIELD_LIMITS, LIMITS, NO_CATEGORY, activeMenu, isCategory,
     type Category, type Menu, type MenuItem, type MenuStore, type MenuTemplate, type TextField,
 } from '../shared/menu';
 import {
@@ -221,7 +221,7 @@ async function saveItem(c: Ctx, id: string | null) {
     const data = Object.fromEntries(
         (Object.entries(FIELD_LIMITS) as [TextField, number][]).map(([f, max]) => [f, clip(body[f], max)]),
     ) as Record<TextField, string>;
-    const category: Category = isCategory(body.category) ? body.category : 'Ostatní';
+    const category: Category = isCategory(body.category) ? body.category : body.category ? 'Ostatní' : NO_CATEGORY;
     if (!data.name) return fail(c, 422, 'Název jídla je povinný.');
 
     const store = await readStore(c.env);

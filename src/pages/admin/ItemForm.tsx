@@ -8,7 +8,7 @@ import { useStore } from '../../useMenu';
 import { useAdminErrorHandler } from './useAdminAction';
 
 type Draft = Omit<MenuItem, 'id'>;
-const EMPTY: Draft = { name: '', category: 'Hlavní jídlo', description: '', price: '', weight: '', allergens: '', image: null };
+const EMPTY: Draft = { name: '', category: NO_CATEGORY, description: '', price: '', weight: '', allergens: '', image: null };
 
 export default function ItemForm({ id }: { id?: string }) {
     const isNew = !id;
@@ -100,8 +100,8 @@ export default function ItemForm({ id }: { id?: string }) {
                     </label>
                     <label className="grow">Kategorie
                         <select value={draft.category} onChange={set('category')}>
-                            {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
                             <option value={NO_CATEGORY}>— nezobrazovat kategorii —</option>
+                            {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
                         </select>
                     </label>
                 </div>
